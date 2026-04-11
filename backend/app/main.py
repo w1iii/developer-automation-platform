@@ -10,7 +10,9 @@ app.include_router(users.router)
 app.include_router(auth.router)
 # app.include_router(jobs.router)
 
-EXCLUDED_ROUTES = ["/users/login", "/users/register"]
+EXCLUDED_ROUTES = ["/auth/login", "/auth/register", "/auth/logout"]
+
+current_user = None
 
 
 @app.middleware("http")
