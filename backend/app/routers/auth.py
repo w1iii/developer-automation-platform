@@ -1,17 +1,30 @@
 import bcrypt
 from database import get_cursor, get_db
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from utils.jwt import create_access_token
+from utils.jwt import create_access_token, verify_token
 
 # from datetime import datetime, timedelta
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+bearer = HTTPBearer()
 
 
 class User(BaseModel):
     username: str
     password: str
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+    try:
+        token = credentials.credentials
+        payload = verify_token(token)
+        return payload
+    except Exception:
+        return JSONResponse(status=401, content={"Error": "No token found."})
 
 
 @router.post("/login")
@@ -73,3 +86,8 @@ def register(body: User, conn=Depends(get_db)):
         raise
     finally:
         conn.close()
+
+
+@router.post("/logout")
+def logout(current_user=Depends(get_current_user)):
+    return {"message": f"{current_user['username']} logged out"}

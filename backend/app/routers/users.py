@@ -1,6 +1,7 @@
 from database import get_cursor, get_db
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from routers.auth import get_current_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -11,14 +12,15 @@ class CreateUser(BaseModel):
 
 
 @router.get("/")
-def get_users(conn=Depends(get_db)):
+def get_users(current_user=Depends(get_current_user), conn=Depends(get_db)):
+    print(f"Current User {current_user}")
     users = []
     with get_cursor(conn) as cur:
         cur.execute("SELECT id, username, created_at FROM users")
         data = cur.fetchall()
         for user in data:
             users.append(user["username"])
-        return users
+        return {"current_user": current_user["username"], "Users from db": users}
 
 
 @router.get("/{user_id}")
