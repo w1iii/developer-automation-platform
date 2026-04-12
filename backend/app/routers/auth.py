@@ -65,6 +65,7 @@ async def login(body: User, conn=Depends(get_db)):
 
 @router.post("/register")
 def register(body: User, conn=Depends(get_db)):
+    # ... hash password instead of accepting hash directly
     try:
         username = body.username
         password = body.password

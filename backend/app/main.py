@@ -1,18 +1,30 @@
 from database import connection_pool
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from routers import auth, users
+from routers import auth, jobs, users
 from utils.jwt import verify_token
 
 app = FastAPI()
 
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8080",
+        "http://localhost:5000",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
+
 app.include_router(users.router)
 app.include_router(auth.router)
-# app.include_router(jobs.router)
+app.include_router(jobs.router)
 
 EXCLUDED_ROUTES = ["/auth/login", "/auth/register", "/auth/logout"]
-
-current_user = None
 
 
 @app.middleware("http")
@@ -41,10 +53,10 @@ def startup():
 
 @app.on_event("shutdown")
 def shutdown():
-    connection_pool.closeall()  # close all pool connections on exit
+    connection_pool.closeall()
     print("🔌 Database pool closed")
 
 
-@app.get("/me")
-def root():
-    return {"message": "API is running"}
+@app.get("/health")
+def health():
+    return {"status": "ok"}
