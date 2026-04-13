@@ -88,3 +88,27 @@ def add_job(body: AddJob, current_user=Depends(get_current_user), conn=Depends(g
         except Exception as e:
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to add job: {str(e)}")
+
+
+@router.delete("/delete/{job_id}")
+def delete_job(job_id: int, current_user=Depends(get_current_user), conn=Depends(get_db)):
+    user_id = current_user["user_id"]
+
+    with get_cursor(conn) as cur:
+        try:
+            cur.execute(
+                "SELECT id FROM jobs WHERE user_id = %s AND id = %s", (user_id, job_id)
+            )
+
+            check_job = cur.fetchall()
+            if not check_job:
+                raise HTTPException(status_code=400, detail="Job not found")
+
+            cur.execute("DELETE FROM jobs WHERE user_id = %s AND id = %s", (user_id, job_id))
+            conn.commit()
+
+            return JSONResponse(content={"message": "Job deleted"})
+
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to delete job: {str(e)}")
