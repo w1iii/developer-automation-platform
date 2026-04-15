@@ -164,6 +164,7 @@ def update_job(
             )
 
 
+@router.delete("/delete/{job_id}")
 def delete_job(
     job_id: int, current_user=Depends(get_current_user), conn=Depends(get_db)
 ):
