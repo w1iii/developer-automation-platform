@@ -192,3 +192,21 @@ def delete_job(
             raise HTTPException(
                 status_code=500, detail=f"Failed to delete job: {str(e)}"
             )
+
+
+@router.post("/execute/{job_id}")
+def execute_job(job_id: int, current_user=Depends(get_current_user), conn=Depends(get_db)):
+    from worker import JobWorker
+
+    user_id = current_user["user_id"]
+    job_worker = JobWorker()
+
+    try:
+        result = job_worker.run_job(job_id, user_id, conn)
+        if result.get("status") == "error":
+            raise HTTPException(status_code=404, detail=result.get("message"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
