@@ -1,94 +1,76 @@
 import bcrypt
 from database import get_cursor, get_db
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
-from utils.jwt import create_access_token, verify_token
 
-# from datetime import datetime, timedelta
+from dependencies import get_current_user
+from schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from utils.jwt import create_access_token
+from utils.logging import setup_logger
+
+logger = setup_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-bearer = HTTPBearer()
 
-
-class User(BaseModel):
-    username: str
-    password: str
-
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)):
+@router.post("/login", response_model=TokenResponse)
+def login(body: LoginRequest, conn=Depends(get_db)):
     try:
-        token = credentials.credentials
-        payload = verify_token(token)
-        return payload
-    except Exception:
-        return JSONResponse(status=401, content={"Error": "No token found."})
-
-
-@router.post("/login")
-async def login(body: User, conn=Depends(get_db)):
-    try:
-        username = body.username
-        password = body.password
-        print("Logging in...")
         with get_cursor(conn) as cur:
             cur.execute(
-                "SELECT id, username, password_hash FROM users WHERE username = %s;",
-                (username,),
+                "SELECT id, username, role, password_hash FROM users WHERE username = %s;",
+                (body.username,),
             )
             data = cur.fetchone()
             if not data:
+                logger.warning(f"Login failed: user not found - {body.username}")
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-                return "No user found."
 
             valid_password = bcrypt.checkpw(
-                password.encode("utf-8"), data["password_hash"].encode("utf-8")
+                body.password.encode("utf-8"), data["password_hash"].encode("utf-8")
             )
             if not valid_password:
+                logger.warning(f"Login failed: invalid password - {body.username}")
                 raise HTTPException(status_code=401, detail="Invalid credentials")
-                return "Invalid Credentials"
 
-        # Create Token (utils/jwt.py)
-        token = create_access_token(data["id"], username)
+        role = data.get("role", "user")
+        token = create_access_token(data["id"], body.username, role)
 
-        return {
-            "message": "Login successful",
-            "user_id": data["id"],
-            "access_token": f"Bearer {token}",
-        }
-    except Exception:
+        logger.info(f"User {body.username} logged in successfully")
+        return TokenResponse(
+            message="Login successful",
+            user_id=data["id"],
+            access_token=f"Bearer {token}",
+        )
+    except HTTPException:
         raise
-        print("Server Error")
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/register")
-def register(body: User, conn=Depends(get_db)):
-    # ... hash password instead of accepting hash directly
+def register(body: RegisterRequest, conn=Depends(get_db)):
     try:
-        username = body.username
-        password = body.password
-        password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+        password_hash = bcrypt.hashpw(body.password.encode("utf-8"), bcrypt.gensalt())
         with get_cursor(conn) as cur:
             cur.execute(
-                "INSERT INTO users(username, password_hash) VALUES (%s, %s) RETURNING id;",
-                (username, password_hash.decode("utf-8")),
+                "INSERT INTO users(username, password_hash, role) VALUES (%s, %s, %s) RETURNING id;",
+                (body.username, password_hash.decode("utf-8"), "user"),
             )
             data = cur.fetchone()
-            print(data)
             conn.commit()
 
+        logger.info(f"User {body.username} registered successfully")
         return {
             "message": "Registration successful",
             "user_id": data["id"],
         }
-    except Exception:
-        raise
-    finally:
-        conn.close()
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/logout")
 def logout(current_user=Depends(get_current_user)):
-    return {"message": f"{current_user['username']} logged out"}
+    logger.info(f"User {current_user.username} logged out")
+    return {"message": f"{current_user.username} logged out"}
