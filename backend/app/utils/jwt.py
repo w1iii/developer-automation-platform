@@ -10,10 +10,11 @@ ALGORITHM = "HS256"
 EXPIRE_HOURS = 24
 
 
-def create_access_token(user_id: int, username: str) -> str:
+def create_access_token(user_id: int, username: str, role: str = "user") -> str:
     payload = {
         "user_id": user_id,
         "username": username,
+        "role": role,
         "exp": datetime.utcnow() + timedelta(hours=EXPIRE_HOURS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
