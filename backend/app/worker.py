@@ -1,12 +1,10 @@
-import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
 
 from database import get_cursor
 
-
-SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
+SCRIPTS_DIR = Path(__file__).parent / "scripts/"
 
 
 class JobWorker:
@@ -27,7 +25,9 @@ class JobWorker:
             if not job["is_active"]:
                 return {"status": "error", "message": "Job is not active"}
 
-            script_path = SCRIPTS_DIR / job["script_path"]
+            script_path_str = job["script_path"].lstrip("/")
+            script_path = SCRIPTS_DIR / script_path_str
+            print(SCRIPTS_DIR)
             timeout_seconds = job["timeout_seconds"] or 300
 
             cur.execute(
@@ -108,7 +108,7 @@ class JobWorker:
         except Exception as e:
             return {
                 "stdout": "",
-                "stderr": str(e),
+                "stderr": f"Script error: {e}",
                 "exit_code": 1,
                 "timeout": False,
             }
